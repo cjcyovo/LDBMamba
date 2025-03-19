@@ -1,19 +1,15 @@
 import configargparse
 import torch
 from utils import seed_worker, check_dataset, get_device, metrics, build_ground_truth_image
-from datasets import create_dataloader, create_graphdataloader
+from datasets import create_dataloader
 import numpy as np
-from train import train, train_GCN
-from test import test, test_GCN
+from train import train
+from test import test
 from model import CSMamba
 from sklearn.metrics import classification_report
 import os
 from model import get_model
 import scipy
-
-
-
-
 
 def get_parser():
     """Get default arguments."""
@@ -37,7 +33,6 @@ def get_parser():
     parser.add_argument('--patch_size', type=int, default=15)
     parser.add_argument('--training_sample_ratio', type=float, default=0.8,
                         help='training sample ratio')
-    parser.add_argument('--n_gcn', type=int, default=21, help='number of related pix')
     parser.add_argument('--re_ratio', type=int, default=5,
                         help='multiple of of data augmentation')
     parser.add_argument('--flip_augmentation', action='store_true', default=False,
@@ -79,14 +74,13 @@ def get_parser():
 
 
 def main():
-    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'max_split_size_mb:128'
     parser = get_parser()
     args = parser.parse_args()
     DEVICE = get_device(args.cuda)
     seed_worker(args.seed)
     check_dataset(args)
     if args.algorithm == 'CSMamba':
-        train_loader, test_loader, IGNORED_LABELS, LABEL_VALUES_tar, label_true_queue, label_false_queue = create_dataloader(
+        train_loader, test_loader, IGNORED_LABELS, LABEL_VALUES_tar, label_true_queue = create_dataloader(
             args, DEVICE)
         print(len(train_loader), len(train_loader.dataset), len(test_loader), len(test_loader.dataset))
         net = get_model(args).to(DEVICE)
@@ -100,52 +94,16 @@ def main():
             t_correct, pred, label = test(args, test_loader, DEVICE, net, epoch)
 
             if t_correct > correct:
-                build_ground_truth_image(args.dataset, pred, args.dataset + args.algorithm)
                 correct = t_correct
                 results = metrics(np.concatenate(pred), np.concatenate(label), ignored_labels=IGNORED_LABELS,
                                   n_classes=7)
                 kappa = results['Kappa']
                 print(classification_report(np.concatenate(pred), np.concatenate(label), target_names=LABEL_VALUES_tar,
                                             digits=6))
-            # if epoch == args.num_epoch:
-            #     scipy.io.savemat('datasets/Houston/finaldata.mat', {'regs': regs})
 
             print('source: {} to target: {} max correct: {} max accuracy{: .2f}% kappa{: .2f}\n'.format(
                 args.source_name, args.target_name, correct, 100. * correct / len(test_loader.dataset), 100. * kappa))
-
-    elif args.algorithm == 'GCN':
-        train_loader, test_loader, IGNORED_LABELS, LABEL_VALUES_tar, index_train, index_test = create_graphdataloader(
-            args, DEVICE)
-        print(len(train_loader), len(train_loader.dataset), len(test_loader), len(test_loader.dataset))
-        net = get_model(args).to(DEVICE)
-        print(args)
-        # print(net)
-
-        total_trainable_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
-        print(f'{total_trainable_params / (1024 * 1024):.2f}M training parameters.')
-        correct = 0
-        # acc = 0
-        for epoch in range(1, args.num_epoch + 1):
-
-            net = train_GCN(args, train_loader, DEVICE, net, epoch, index_train)
-            if epoch % 1 == 0:
-                t_correct, pred, label = test_GCN(args, test_loader, DEVICE, net, epoch, index_test)
-                if t_correct > correct:
-                    # build_ground_truth_image(args.dataset, pred, args.dataset + args.algorithm)
-                    correct = t_correct
-                    results = metrics(np.concatenate(pred), np.concatenate(label), ignored_labels=IGNORED_LABELS,
-                                      n_classes=7)
-                    kappa = results['Kappa']
-                    print(classification_report(np.concatenate(pred), np.concatenate(label),
-                                                target_names=LABEL_VALUES_tar,
-                                                digits=6))
-                # if epoch == args.num_epoch:
-                #     scipy.io.savemat('datasets/Houston/finaldata.mat', {'regs': regs})
-
-                print('source: {} to target: {} max correct: {} max accuracy{: .2f}% kappa{: .2f}\n'.format(
-                    args.source_name, args.target_name, correct, 100. * correct / len(test_loader.dataset),
-                                                                 100. * kappa))
-
+            
 
 if __name__ == "__main__":
     main()
