@@ -5,7 +5,7 @@ from datasets import create_dataloader
 import numpy as np
 from train import train
 from test import test
-from model import CSMamba
+from model import LDBMamba
 from sklearn.metrics import classification_report
 import os
 from model import get_model
