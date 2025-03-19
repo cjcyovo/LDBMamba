@@ -256,8 +256,7 @@ class CSMamba(nn.Module):
         self.spa_size = spa_size
         self.spe_size = spe_size
         self.patch_size = patch_size
-        self.inchannel = 220
-        self.n_bands = 110
+        self.n_bands = n_bands
         self.layer_d_model = layer_d_model
         if self.patch_size == 15:
             self.spa_seqlen = (self.patch_size//self.spa_size) * (self.patch_size // self.spa_size)
