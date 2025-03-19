@@ -1,46 +1,11 @@
-#algorithm: CSMamba
-#dataset: Houston
-#patch_size: 15
-#lr: 1e-2
-#batch_size: 256
-#seed: 0
-#training_sample_ratio: 0.8
-#alpha: 1e-2
-#spa_size: 3
-#spe_size: 4
-#layer_d_model: [64, 64, 32, 32, 16]
-#algorithm: CSMamba
-#dataset: Pavia
-#patch_size: 15
-#lr: 1e-3
-#batch_size: 256
-#seed: 0
-#training_sample_ratio: 0.8
-#alpha: 1e-3
-#spa_size: 3
-#spe_size: 6
-#layer_d_model: [64, 64, 32, 32, 16]
-
 algorithm: CSMamba
-dataset: Indiana
+dataset: Houston
 patch_size: 15
-lr: 1e-3
+lr: 1e-2
 batch_size: 256
 seed: 0
 training_sample_ratio: 0.8
-alpha: 1e-3
+alpha: 1e-2
 spa_size: 3
 spe_size: 4
 layer_d_model: [64, 64, 32, 32, 16]
-#algorithm: CSMamba
-#dataset: HyRANK
-#patch_size: 15
-#lr: 1e-2
-#batch_size: 256
-#seed: 0
-#training_sample_ratio: 0.8
-#alpha: 1e-3
-#spa_size: 3
-#spe_size: 4
-#layer_d_model: [64, 64, 32, 32, 16]
-
