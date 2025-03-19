@@ -6,7 +6,7 @@ import time
 
 
 def test(args, dataloader, DEVICE, model, epoch):
-    if args.algorithm == 'CSMamba':
+    if args.algorithm == 'LDBMamba':
         model.eval()
         loss = 0
         correct = 0
