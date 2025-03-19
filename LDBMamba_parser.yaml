@@ -1,4 +1,4 @@
-algorithm: CSMamba
+algorithm: LDBMamba
 dataset: Houston
 patch_size: 15
 lr: 1e-2
