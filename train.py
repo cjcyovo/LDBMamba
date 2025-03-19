@@ -9,7 +9,7 @@ import torch.nn as nn
 
 
 def train(args, dataloader, DEVICE, model, epoch, label_name, text_queue):
-    if args.algorithm == 'CSMamba':
+    if args.algorithm == 'LDBMamba':
         CNN_correct = 0
         LEARNING_RATE = args.lr / math.pow((1 + 10 * (epoch - 1) / epoch), 0.75)
         optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE)
