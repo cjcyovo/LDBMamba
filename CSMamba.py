@@ -5,31 +5,6 @@ import math
 import torch.nn.functional as F
 import numpy as np
 
-
-class basic_conv(nn.Module):
-    def __init__(self, in_channel, out_channel, mode):
-        super(basic_conv, self).__init__()
-        self.in_channel = in_channel
-        self.out_channel = out_channel
-        self.mode = mode
-        self.Conv3d = nn.Conv3d(1, 1, 3, 1, 1, bias=False)
-        self.Bn3d = nn.BatchNorm3d(1)
-        self.Conv2d = nn.Conv2d(self.in_channel, self.out_channel, 1, 1 ,bias=False)
-        self.Bn2d = nn.BatchNorm2d(self.out_channel)
-
-    def forward(self, x):
-        if self.mode == '3D':
-            image = self.Conv3d(x.unsqueeze(1))
-            image = self.Bn3d(image).squeeze(1)
-            return image
-        elif self.mode == '2D':
-            image = self.Conv2d(x)
-            image = self.Bn2d(image)
-            return image
-        else:
-            return x
-
-
 class spa_patchfy(nn.Module):
     def __init__(self, spa_size, patch_size, channel, D_model):
         super(spa_patchfy, self).__init__()
@@ -67,64 +42,6 @@ class spa_patchfy(nn.Module):
 
         return positional_encoding
 
-    def from_front_to_back(self, x):
-        return x
-
-    def from_back_to_front(self, x):
-        x = x.flip(dims=[1])
-        return x
-
-    def from_front_to_back_inverse(self, x):
-        for i in range(self.mini_patch_size):
-            if (i + 1) % 2 == 1:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-            else:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-        return x
-
-    def from_back_to_front_inverse(self, x):
-        x = x.flip(dims=[1])
-        for i in range(self.mini_patch_size):
-            if (i + 1) % 2 == 1:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-            else:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-        return x
-
-    def from_front_to_back_snake(self, x):
-        for i in range(self.mini_patch_size):
-            if (i + 1) % 2 == 1:
-                continue
-            else:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-        return x
-
-    def from_back_to_front_snake(self, x):
-        x = x.flip(dims=[1])
-        for i in range(self.mini_patch_size):
-            if (i + 1) % 2 == 1:
-                continue
-            else:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-        return x
-
-    def from_front_to_back_snake_inverse(self, x):
-        for i in range(self.mini_patch_size):
-            if (i + 1) % 2 == 1:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-            else:
-                continue
-        return x
-
-    def from_back_to_front_snake_inverse(self, x):
-        x = x.flip(dims=[1])
-        for i in range(self.mini_patch_size):
-            if (i + 1) % 2 == 1:
-                x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size]=x[:, i*self.mini_patch_size:i*self.mini_patch_size+self.mini_patch_size].flip(dims=[1])
-            else:
-                continue
-        return x
-
     def forward(self, x):
         x = self.proj(x)
         x = x.permute(0, 2, 3, 1)
@@ -134,51 +51,7 @@ class spa_patchfy(nn.Module):
         x = x.flatten(2)  # BCHW -> BCM
         x = self.Espa(x)
         x = x.transpose(1, 2)
-        # x = (self.from_front_to_back(x) + self.from_back_to_front(x))/2
         return x
-
-
-class spa_inverse_patchfy(nn.Module):
-    def __init__(self, spa_size, patch_size, channel, D_model):
-        super(spa_inverse_patchfy, self).__init__()
-        self.channel = channel
-        self.spa_size = spa_size
-        self.patch_size = patch_size
-        self.Dyipie = self.channel * self.spa_size * self.spa_size
-        self.D_model = D_model
-        self.proj_inverse = nn.ConvTranspose2d(self.Dyipie, self.channel, self.spa_size, self.spa_size)
-        self.Espa_inverse = nn.ConvTranspose1d(self.D_model, self.Dyipie, 1, 1)
-        self.positional_embedding = nn.init.normal_(self.get_2d_positional_encoding(self.patch_size//self.spa_size,
-                                                                                    self.Dyipie), std=0.01)
-
-    def get_2d_positional_encoding(self, L, D):
-        assert D % 2 == 0, "Dimension must be even"
-        positional_encoding = torch.zeros(L, L, D).cuda(0)
-
-        for i in range(L):
-            for j in range(L):
-                for d in range(D):
-                    if d % 2 == 0:
-                        # 对于偶数索引d，使用sin函数
-                        positional_encoding[i, j, d] = math.sin(i / (10000 ** (d / D))) + math.sin(
-                            j / (10000 ** ((d + 1) / D)))
-                    else:
-                        # 对于奇数索引d，使用cos函数
-                        positional_encoding[i, j, d] = math.cos(i / (10000 ** ((d - 1) / D))) + math.cos(
-                            j / (10000 ** (d / D)))
-
-        return positional_encoding
-
-    def forward(self, x):
-        x = x.transpose(1, 2)
-        x = self.Espa_inverse(x)
-        x = x.view(x.shape[0], x.shape[1], self.patch_size//self.spa_size, self.patch_size//self.spa_size)
-        x = x.permute(0, 2, 3, 1)
-        x = self.positional_embedding.cuda(0) - x
-        x = x.permute(0, 3, 1, 2)
-        x = self.proj_inverse(x)
-        return x
-
 
 class spe_patchfy(nn.Module):
     def __init__(self, spe_size, patch_size, channel, D_model, center_size=3):
@@ -214,34 +87,6 @@ class spe_patchfy(nn.Module):
         # add 1d positional embedding
         # x = (self.from_front_to_back(x) + self.from_back_to_front(x))/2
         return x
-
-
-class spe_inverse_patchfy(nn.Module):
-    def __init__(self, spe_size, patch_size, channel, D_model, center_size=3):
-        super(spe_inverse_patchfy, self).__init__()
-        self.patch_size = patch_size
-        self.spe_size = spe_size
-        self.center_size = center_size
-        self.spamap_size = center_size*center_size
-        self.Dyipie = self.spamap_size * self.spe_size
-        self.D_model = D_model
-        self.channel = channel
-        self.padnum = (patch_size-center_size)//2
-        self.proj = nn.ConvTranspose1d(self.Dyipie, self.spamap_size, self.spe_size, self.spe_size)
-        self.Espe = nn.ConvTranspose1d(self.D_model, self.Dyipie, 1, 1)
-        self.positional_embedding = nn.init.normal_(
-            nn.Parameter(torch.empty(self.channel // self.spe_size, self.D_model)), std=0.01)
-
-    def forward(self, x):
-        x = x - self.positional_embedding
-        x = x.transpose(1, 2)
-        x = self.Espe(x)
-        x = self.proj(x)
-        x = x.transpose(1, 2)
-        x = x.view(x.shape[0], x.shape[1], 3, 3)
-        x = F.pad(x, (self.padnum, self.padnum, self.padnum, self.padnum), mode='constant', value=0)
-        return x
-
 
 class spa_spe_star_fusion(nn.Module):
     def __init__(self, ind_model, outd_model):
@@ -298,7 +143,6 @@ class RMSNorm(nn.Module):
 
     def forward(self, x):
         output = x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.weight
-
         return output
 
 
@@ -385,13 +229,6 @@ class ss_linear_block(nn.Module):
             nn.Dropout(emb_dropout),
             nn.Linear(self.d_model, 256)
         )
-        # self.reg_head = nn.Sequential(
-        #     nn.Linear(self.d_model, self.d_model),
-        #     nn.ReLU(),
-        #     nn.Dropout(emb_dropout),
-        #     nn.Linear(self.d_model, 256)
-        # )
-
 
     def forward(self, spa_token, spe_token):
         if self.end == 0:
@@ -410,32 +247,6 @@ class ss_linear_block(nn.Module):
             result = spa_token + spe_token
             result = self.to_latent(result)
             return self.mlp_head(result), self.pro_head(result)
-
-
-class ss_pro_block(nn.Module):
-    def __init__(self, d_model, embed_dim, emb_dropout=0.):
-        super(ss_pro_block, self).__init__()
-        self.d_model = d_model
-        self.embed_dim = embed_dim
-        self.bnspa = nn.BatchNorm1d(self.d_model)
-        self.bnspe = nn.BatchNorm1d(self.d_model)
-        self.to_latent = nn.Identity()
-        self.mlp_head = nn.Sequential(
-            nn.Linear(self.d_model, self.embed_dim),
-            nn.ReLU(),
-            nn.Dropout(emb_dropout),
-            nn.Linear(self.embed_dim, embed_dim)
-        )
-
-
-    def forward(self, spa_token, spe_token):
-        spa_token = spa_token[:, spa_token.size(1) // 2 + 1, :]
-        spa_token = self.bnspa(spa_token)
-        spe_token = spe_token.mean(dim=1)
-        spe_token = self.bnspe(spe_token)
-        result = spa_token + spe_token
-        result = self.to_latent(result)
-        return self.mlp_head(result)
 
 class CSMamba(nn.Module):
     def __init__(self, context_length=77, vocab_size=49408, batch_size=256, n_bands=48, patch_size=27, emb_dropout=0, spa_size=3, spe_size=4, layer_d_model=[64, 64, 32, 16, 8]):
@@ -469,7 +280,6 @@ class CSMamba(nn.Module):
         self.text_projection = nn.Parameter(torch.empty(self.td_model, self.embed_dim))
         self.initialize_parameters()
 
-        self.Basic_Conv = basic_conv(self.inchannel, self.n_bands, '2D')
         self.spa1 = spa_patchfy(self.spa_size, self.patch_size, self.n_bands, self.d_model)
         self.spe1 = spe_patchfy(self.spe_size, self.patch_size, self.n_bands, self.d_model)
         self.block0 = big_mamba_block(self.layer_d_model[0], self.layer_d_model[1], self.spa_seqlen, self.spe_seqlen)
@@ -483,19 +293,10 @@ class CSMamba(nn.Module):
         self.zhanping2 = ss_linear_block(self.layer_d_model[2])
         self.zhanping3 = ss_linear_block(self.layer_d_model[3])
         self.zhanping4 = ss_linear_block(self.layer_d_model[4], end=1)
-        # self.proj = ss_pro_block(self.d_model//2, self.embed_dim)
+
         self.weight1 = nn.Parameter(torch.ones(1, requires_grad=True))
         self.weight2 = nn.Parameter(torch.ones(1, requires_grad=True))
         self.weight3 = nn.Parameter(torch.ones(1, requires_grad=True))
-
-        # self.pro_head = nn.Sequential(
-        #     nn.Linear(self._get_first_size(), self.embed_dim),
-        #     nn.ReLU(),
-        #     nn.Dropout(emb_dropout),
-        #     nn.Linear(self.embed_dim, self.embed_dim)
-        # )
-
-
 
     def _get_first_size(self):
         with torch.no_grad():
@@ -521,7 +322,6 @@ class CSMamba(nn.Module):
         return x
 
     def encode_image(self, image):
-        image = self.Basic_Conv(image)
         spa_token = self.spa1(image)
         spe_token = self.spe1(image)
         spa_token, spe_token = self.block0(spa_token, spe_token)
@@ -546,11 +346,11 @@ class CSMamba(nn.Module):
             logit_scale = self.logit_scale.exp()
             logits_per_image = logit_scale * image_features @ text_features.t()
             logits_per_text = logit_scale * text_features @ image_features.t()
-            #
+            
             logits_per_image = logits_per_image * torch.sign(logits_per_image)
             logits_per_text = logits_per_text * torch.sign(logits_per_text)
             loss_img = F.cross_entropy(logits_per_image, label.long())
             loss_text = F.cross_entropy(logits_per_text, label.long())
             return (loss_img + loss_text)/2, image_cls/3
         else:
-            return image_cls/2
+            return image_cls/3
